@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Order Exporter",
+  "version": "1.0.0",
+  "description": "Export Amazon order history to CSV",
+  "permissions": [],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.amazon.com.au/gp/your-account/order-history*",
+        "*://*.amazon.com.au/your-orders/*",
+        "*://*.amazon.com/gp/your-account/order-history*",
+        "*://*.amazon.com/your-orders/*",
+        "*://*.amazon.co.uk/gp/your-account/order-history*",
+        "*://*.amazon.co.uk/your-orders/*",
+        "*://*.amazon.ca/gp/your-account/order-history*",
+        "*://*.amazon.ca/your-orders/*",
+        "*://*.amazon.de/gp/your-account/order-history*",
+        "*://*.amazon.de/your-orders/*",
+        "*://*.amazon.co.jp/gp/your-account/order-history*",
+        "*://*.amazon.co.jp/your-orders/*",
+        "*://*.amazon.in/gp/your-account/order-history*",
+        "*://*.amazon.in/your-orders/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

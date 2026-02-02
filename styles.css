@@ -1,0 +1,32 @@
+#amz-order-exporter-btn {
+  background-color: #f0c14b;
+  background-image: linear-gradient(to bottom, #f7dfa5, #f0c14b);
+  border: 1px solid #a88734;
+  border-radius: 3px;
+  color: #111;
+  cursor: pointer;
+  font-family: "Amazon Ember", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  margin-left: 12px;
+  vertical-align: middle;
+}
+
+#amz-order-exporter-btn:hover {
+  background-image: linear-gradient(to bottom, #f5d78e, #eeb933);
+}
+
+#amz-order-exporter-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#amz-order-exporter-status {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 13px;
+  color: #555;
+  vertical-align: middle;
+  font-family: "Amazon Ember", Arial, sans-serif;
+}
