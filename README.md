@@ -35,9 +35,9 @@ US, UK, Canada, Australia, Germany, Japan, and India Amazon stores.
 
 The extension injects a content script into Amazon order history pages. When you click export, it:
 
-1. Counts your total orders on the current page filter
-2. Fetches each page of results (10 orders per page, with a short delay between requests)
+1. Parses orders from the current page
+2. Follows the pagination "Next" links to fetch each subsequent page (with a short delay between requests)
 3. Parses the order date, total, product names, and order ID from each order card
 4. Generates and downloads a CSV file
 
-No data is sent anywhere -- everything runs locally in your browser. The extension requires no special permissions.
+Both regular orders and subscription orders are included. No data is sent anywhere -- everything runs locally in your browser. The extension requires no special permissions.
