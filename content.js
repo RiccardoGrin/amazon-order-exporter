@@ -11,25 +11,34 @@
   }
 
   function parseOrdersFromDocument(doc) {
-    const cards = doc.querySelectorAll(".order-card.js-order-card");
+    const cards = doc.querySelectorAll(".order-card");
     const orders = [];
 
     cards.forEach((card) => {
       const header = card.querySelector(".order-header");
       if (!header) return;
 
-      // Extract date: the span right after "Order placed" label
-      let date = "";
       const headerItems = header.querySelectorAll(
         ".order-header__header-list-item"
       );
+
+      // Extract date from the first header item that contains a date-like label
+      // Handles "Order placed", "Subscription charged on", etc.
+      let date = "";
       headerItems.forEach((item) => {
-        const label = item.querySelector(".a-text-caps");
-        if (label && label.textContent.trim().toLowerCase() === "order placed") {
-          const valueEl = item.querySelector(
-            ".a-size-base.a-color-secondary.aok-break-word"
-          );
-          if (valueEl) date = valueEl.textContent.trim();
+        if (date) return;
+        const valueEl = item.querySelector(
+          ".a-size-base.a-color-secondary.aok-break-word"
+        );
+        if (!valueEl) return;
+        const value = valueEl.textContent.trim();
+        // Match values that look like a date (contain a month name)
+        if (
+          /\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(
+            value
+          )
+        ) {
+          date = value;
         }
       });
 
@@ -77,40 +86,33 @@
     return orders;
   }
 
+  function getNextPageUrl(doc) {
+    // Amazon's "Next" link is inside <li class="a-last"><a href="...">
+    const nextLink = doc.querySelector(".a-pagination .a-last a");
+    if (!nextLink) return null;
+    const href = nextLink.getAttribute("href");
+    if (!href) return null;
+    // Convert relative URL to absolute
+    return new URL(href, window.location.origin).toString();
+  }
+
   function getTotalOrderCount(doc) {
-    // Look for text like "49 orders placed in" or "123 orders"
-    const countEl = doc.querySelector(
-      ".num-orders, .a-spacing-mini .a-normal"
-    );
-    // Fallback: search for any element containing "X orders placed"
-    const allText = doc.body.innerText;
-    const match = allText.match(/(\d+)\s+orders?\s+placed/i);
-    if (match) return parseInt(match[1], 10);
-    return 0;
-  }
-
-  function buildPageUrl(baseUrl, startIndex) {
-    const url = new URL(baseUrl);
-    url.searchParams.set("startIndex", startIndex);
-    return url.toString();
-  }
-
-  function getBaseUrl() {
-    // Use the current page URL, preserving the timeFilter param
-    const url = new URL(window.location.href);
-    // Remove startIndex so we can set it ourselves
-    url.searchParams.delete("startIndex");
-    // Remove ref_ params (not needed)
-    for (const key of [...url.searchParams.keys()]) {
-      if (key.startsWith("ref_") || key === "ref") {
-        url.searchParams.delete(key);
-      }
+    // Read from the .num-orders element: "49 orders"
+    const numEl = doc.querySelector(".num-orders");
+    if (numEl) {
+      const match = numEl.textContent.match(/(\d+)/);
+      if (match) return parseInt(match[1], 10);
     }
-    return url.toString();
+    return null;
   }
 
   async function fetchPage(url) {
-    const resp = await fetch(url, { credentials: "include" });
+    // Add disableCsd parameter to get unencrypted HTML
+    // (Amazon encrypts order data client-side via "Siege CSD" which
+    //  doesn't run when we fetch HTML without executing JavaScript)
+    const fetchUrl = new URL(url);
+    fetchUrl.searchParams.set("disableCsd", "true");
+    const resp = await fetch(fetchUrl.toString(), { credentials: "include" });
     const html = await resp.text();
     const parser = new DOMParser();
     return parser.parseFromString(html, "text/html");
@@ -168,35 +170,40 @@
       status.textContent = "Counting orders...";
 
       try {
-        const ORDERS_PER_PAGE = 10;
         let allOrders = [];
 
-        // Get total order count from the current page
+        // Try to detect total for display
         const totalOrders = getTotalOrderCount(document);
-        const totalPages = Math.max(1, Math.ceil(totalOrders / ORDERS_PER_PAGE));
-        const baseUrl = getBaseUrl();
+        if (totalOrders) {
+          status.textContent = `Found ${totalOrders} orders. Scraping page 1...`;
+        } else {
+          status.textContent = "Scraping page 1...";
+        }
 
-        status.textContent = `Found ${totalOrders} orders across ${totalPages} page(s). Scraping page 1...`;
-
-        // Parse the current page first
+        // Parse the current page
         const currentOrders = parseOrdersFromDocument(document);
         allOrders = allOrders.concat(currentOrders);
 
-        // Fetch remaining pages by incrementing startIndex
-        for (let page = 2; page <= totalPages; page++) {
-          status.textContent = `Scraping page ${page} of ${totalPages}... (${allOrders.length} orders so far)`;
+        // Follow the "Next" pagination link from the current page
+        let nextUrl = getNextPageUrl(document);
+        let page = 2;
+
+        while (nextUrl) {
+          status.textContent = `Scraping page ${page}... (${allOrders.length} orders so far)`;
 
           // Small delay to be respectful to Amazon's servers
           await new Promise((r) => setTimeout(r, 800));
 
-          const startIndex = (page - 1) * ORDERS_PER_PAGE;
-          const pageUrl = buildPageUrl(baseUrl, startIndex);
-
-          const doc = await fetchPage(pageUrl);
+          const doc = await fetchPage(nextUrl);
           const orders = parseOrdersFromDocument(doc);
 
-          if (orders.length === 0) break; // No more orders, stop early
+          if (orders.length === 0) break;
+
           allOrders = allOrders.concat(orders);
+
+          // Get the next page URL from the fetched page's pagination
+          nextUrl = getNextPageUrl(doc);
+          page++;
         }
 
         if (allOrders.length === 0) {
@@ -209,7 +216,7 @@
         const today = new Date().toISOString().slice(0, 10);
         downloadCSV(csv, `amazon-orders-${today}.csv`);
 
-        status.textContent = `Done! Exported ${allOrders.length} orders across ${totalPages} page(s).`;
+        status.textContent = `Done! Exported ${allOrders.length} orders across ${page - 1} page(s).`;
       } catch (err) {
         status.textContent = "Error: " + err.message;
         console.error("Amazon Order Exporter error:", err);
